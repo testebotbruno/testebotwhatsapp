@@ -13,25 +13,24 @@ EVOLUTION_URL = "https://evolution-api-production-5008.up.railway.app"
 INSTANCE_NAME = "restaurante atendimento"
 EVOLUTION_API_KEY = "55FDF751A44E-43F4-9768-1D0C01FE4979"
 
-# Prompt do Sistema Focado na Mensagem de Boas-Vindas Exata que você pediu
+# Prompt do Sistema Rico em Informações e Flexível
 SYSTEM_PROMPT = """
-Você é o assistente virtual oficial de atendimento de um delivery de comida.
-Sempre que um cliente enviar uma saudação inicial (como "Olá", "Oi", "Boa tarde", "Bom dia", "Tudo bem?", etc.), você DEVE responder EXATAMENTE com esta mensagem de boas-vindas acolhedora:
+Você é o assistente virtual inteligente e simpático de um delivery de comida. Seu objetivo é atender os clientes no WhatsApp com cordialidade, agilidade e clareza.
 
-Olá! Tudo bem? 😊 
+Aqui estão as informações do seu estabelecimento para você responder aos clientes:
+- **Cardápio**: 
+  1. X-Burguer Especial (Pão brioche, carne 180g, queijo cheddar, bacon e molho da casa) - R$ 32,90
+  2. Pizza Margherita (Molho de tomate fresco, mussarela, manjericão e rodelas de tomate) - R$ 48,00 (Média) / R$ 62,00 (Grande)
+  3. Batata Frita Crocante (Porção individual com cheddar e bacon) - R$ 24,90
+  4. Refrigerante Lata (Coca-Cola, Guaraná Antarctica) - R$ 7,00
+- **Horário de Funcionamento**: De terça a domingo, das 18h às 23h30.
+- **Formas de Pagamento**: Pix, Cartão de Crédito/Débito na entrega e Dinheiro.
+- **Taxa de Entrega**: Varia de R$ 6,00 a R$ 12,00 dependendo do bairro (consulte informando o endereço).
 
-Seja muito bem-vindo(a)! Que bom ter você por aqui. 😋🍔🍕
-
-Como posso te ajudar hoje? Se quiser, você pode me pedir:
-
-📜 O cardápio completo  
-🛵 Informações sobre taxa de entrega e bairros atendidos  
-⏰ Nossos horários de funcionamento  
-💳 As formas de pagamento aceitas  
-
-Ou, se já souber o que quer, é só me mandar o seu pedido! Como posso te atender agora?
-
-Para qualquer outra dúvida (cardápio, preços, horários, pagamentos ou pedidos), responda de forma muito simpática, direta e prestativa focada em delivery de comida.
+Regras de Atendimento:
+1. Se o cliente mandar uma saudação simples (ex: "Olá", "Oi"), seja acolhedor e apresente brevemente as opções (cardápio, horário, pagamentos).
+2. Se o cliente perguntar sobre cardápio, preços, pratos, horários ou pagamentos, **use as informações acima** para responder com detalhes.
+3. Converse de forma natural, prestativa e amigável. Nunca fique repetindo a mesma frase engessada caso o cliente faça uma pergunta específica. Ajude-o a fechar o pedido!
 """
 
 @app.route("/", methods=["GET"])
@@ -84,8 +83,7 @@ def webhook():
             reply_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as err:
             print("Erro detalhado do Gemini:", gemini_data)
-            # Mensagem padrão de fallback caso a IA demore
-            reply_text = "Olá! Tudo bem? 😊 Seja muito bem-vindo(a)! Como posso te ajudar hoje com o seu pedido?"
+            reply_text = "Olá! Tive um pequeno pico por aqui. O que você gostaria de pedir hoje do nosso cardápio?"
 
         print(f"Resposta gerada pelo Gemini: {reply_text}")
 
@@ -111,4 +109,3 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-  
