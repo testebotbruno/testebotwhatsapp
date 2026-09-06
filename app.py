@@ -26,45 +26,34 @@ def webhook():
         data = request.json
         print("Dados recebidos da Evolution API:", data)
         
-        # Ignora eventos que não sejam de mensagens (como status de conexão)
-        event_type = data.get("event", "")
-        if event_type and event_type != "messages.upsert":
+        # Filtra apenas eventos de mensagens novas
+        if data.get("event") != "messages.upsert":
             return jsonify({"status": "ignored_event"}), 200
 
-        # Garante que message_data seja tratado corretamente caso venha como lista
         raw_data = data.get("data", {})
-        if isinstance(raw_data, list):
-            if len(raw_data) > 0:
-                message_data = raw_data[0]
-            else:
-                return jsonify({"status": "ignored"}), 200
-        elif isinstance(raw_data, dict):
-            message_data = raw_data
-        else:
+        message_data = raw_data[0] if isinstance(raw_data, list) and len(raw_data) > 0 else raw_data
+        if not isinstance(message_data, dict):
             return jsonify({"status": "ignored"}), 200
 
-        message_body = ""
-        
-        # Tenta pegar o texto da mensagem dependendo do formato do evento
-        if isinstance(message_data, dict) and "message" in message_data:
-            msg_content = message_data.get("message", {})
-            if isinstance(msg_content, dict):
-                message_body = msg_content.get("conversation") or msg_content.get("extendedTextMessage", {}).get("text", "")
-        
-        # Se não achou na estrutura interna, tenta pegar direto no corpo
-        if not message_body and isinstance(message_data, dict):
-            message_body = message_data.get("body", "")
-
-        sender_number = message_data.get("key", {}).get("remoteJid", "") if isinstance(message_data, dict) else ""
-        
-        # Ignora mensagens vazias ou enviadas pelo próprio bot
-        is_from_me = message_data.get("key", {}).get("fromMe", False) if isinstance(message_data, dict) else False
-        if not message_body or is_from_me:
+        # Ignora se for mensagem enviada pelo próprio bot
+        if message_data.get("key", {}).get("fromMe", False):
             return jsonify({"status": "ignored"}), 200
 
-        print(f"Mensagem recebida de {sender_number}: {message_body}")
+        # Extrai o conteúdo do texto apenas se for uma mensagem de texto válida
+        msg_content = message_data.get("message", {})
+        if not isinstance(msg_content, dict):
+            return jsonify({"status": "ignored"}), 200
 
-        # Gera a resposta utilizando o modelo oficial atualizado
+        message_body = msg_content.get("conversation") or msg_content.get("extendedTextMessage", {}).get("text", "")
+        
+        # Se não houver texto puro (ex: foi emoji, foto, áudio ou reação), ignora
+        if not message_body:
+            return jsonify({"status": "ignored_no_text"}), 200
+
+        sender_number = message_data.get("key", {}).get("remoteJid", "")
+        print(f"Mensagem de texto recebida de {sender_number}: {message_body}")
+
+        # Gera a resposta utilizando o modelo oficial do Gemini
         response = client.models.generate_content(
             model="gemini-3.6-flash",
             contents=message_body,
