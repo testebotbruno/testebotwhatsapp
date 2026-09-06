@@ -55,9 +55,9 @@ def webhook():
 
         print(f"Mensagem recebida de {sender_number}: {message_body}")
 
-        # Gera a resposta utilizando o Gemini (atualizado para gemini-1.5-flash)
+        # Gera a resposta utilizando o Gemini com o modelo correto
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-2.5-flash",
             contents=message_body,
             config={
                 "system_instruction": SYSTEM_PROMPT,
@@ -76,3 +76,4 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
