@@ -26,6 +26,11 @@ def webhook():
         data = request.json
         print("Dados recebidos da Evolution API:", data)
         
+        # Ignora eventos que não sejam de mensagens (como status de conexão)
+        event_type = data.get("event", "")
+        if event_type and event_type != "messages.upsert":
+            return jsonify({"status": "ignored_event"}), 200
+
         # Garante que message_data seja tratado corretamente caso venha como lista
         raw_data = data.get("data", {})
         if isinstance(raw_data, list):
@@ -33,24 +38,28 @@ def webhook():
                 message_data = raw_data[0]
             else:
                 return jsonify({"status": "ignored"}), 200
-        else:
+        elif isinstance(raw_data, dict):
             message_data = raw_data
+        else:
+            return jsonify({"status": "ignored"}), 200
 
         message_body = ""
         
         # Tenta pegar o texto da mensagem dependendo do formato do evento
-        if "message" in message_data:
+        if isinstance(message_data, dict) and "message" in message_data:
             msg_content = message_data.get("message", {})
-            message_body = msg_content.get("conversation") or msg_content.get("extendedTextMessage", {}).get("text", "")
+            if isinstance(msg_content, dict):
+                message_body = msg_content.get("conversation") or msg_content.get("extendedTextMessage", {}).get("text", "")
         
         # Se não achou na estrutura interna, tenta pegar direto no corpo
-        if not message_body:
+        if not message_body and isinstance(message_data, dict):
             message_body = message_data.get("body", "")
 
-        sender_number = message_data.get("key", {}).get("remoteJid", "")
+        sender_number = message_data.get("key", {}).get("remoteJid", "") if isinstance(message_data, dict) else ""
         
         # Ignora mensagens vazias ou enviadas pelo próprio bot
-        if not message_body or message_data.get("key", {}).get("fromMe", False):
+        is_from_me = message_data.get("key", {}).get("fromMe", False) if isinstance(message_data, dict) else False
+        if not message_body or is_from_me:
             return jsonify({"status": "ignored"}), 200
 
         print(f"Mensagem recebida de {sender_number}: {message_body}")
@@ -76,3 +85,4 @@ def webhook():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
+
