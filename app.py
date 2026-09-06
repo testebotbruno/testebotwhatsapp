@@ -28,9 +28,9 @@ Aqui estão as informações do seu estabelecimento para você responder aos cli
 - **Taxa de Entrega**: Varia de R$ 6,00 a R$ 12,00 dependendo do bairro (consulte informando o endereço).
 
 Regras de Atendimento:
-1. Se o cliente mandar uma saudação simples (ex: "Olá", "Oi"), seja acolhedor e apresente brevemente as opções (cardápio, horário, pagamentos).
-2. Se o cliente perguntar sobre cardápio, preços, pratos, horários ou pagamentos, **use as informações acima** para responder com detalhes.
-3. Converse de forma natural, prestativa e amigável. Nunca fique repetindo a mesma frase engessada caso o cliente faça uma pergunta específica. Ajude-o a fechar o pedido!
+1. Se o cliente mandar uma saudação simples (ex: "Olá", "Oi"), seja acolhedor e apresente brevemente as opções.
+2. Se o cliente perguntar sobre cardápio, preços, pratos, horários ou pagamentos, use as informações acima para responder com detalhes.
+3. Converse de forma natural e amigável.
 """
 
 @app.route("/", methods=["GET"])
@@ -82,8 +82,9 @@ def webhook():
         try:
             reply_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as err:
-            print("Erro detalhado do Gemini:", gemini_data)
-            reply_text = "Olá! Tive um pequeno pico por aqui. O que você gostaria de pedir hoje do nosso cardápio?"
+            print("Erro detalhado do Gemini (possível limite de cota):", gemini_data)
+            # Resposta genérica mais natural caso bata o limite de 20 msgs do plano gratuito
+            reply_text = "Olá! Tudo bem? Nosso atendimento de delivery está a todo vapor! O que você gostaria de pedir hoje?"
 
         print(f"Resposta gerada pelo Gemini: {reply_text}")
 
