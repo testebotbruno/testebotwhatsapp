@@ -26,8 +26,16 @@ def webhook():
         data = request.json
         print("Dados recebidos da Evolution API:", data)
         
-        # Extrai a mensagem e o remetente com base no padrão da Evolution API
-        message_data = data.get("data", {})
+        # Garante que message_data seja tratado corretamente caso venha como lista
+        raw_data = data.get("data", {})
+        if isinstance(raw_data, list):
+            if len(raw_data) > 0:
+                message_data = raw_data[0]
+            else:
+                return jsonify({"status": "ignored"}), 200
+        else:
+            message_data = raw_data
+
         message_body = ""
         
         # Tenta pegar o texto da mensagem dependendo do formato do evento
@@ -47,9 +55,9 @@ def webhook():
 
         print(f"Mensagem recebida de {sender_number}: {message_body}")
 
-        # Gera a resposta utilizando o Gemini (modelo flash rápido)
+        # Gera a resposta utilizando o Gemini (atualizado para gemini-1.5-flash)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=message_body,
             config={
                 "system_instruction": SYSTEM_PROMPT,
