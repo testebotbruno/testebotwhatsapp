@@ -8,6 +8,11 @@ app = Flask(__name__)
 # Configuração do Gemini API usando a nova SDK oficial (google-genai)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
+# Dados da Evolution API (Configurados diretamente para envio)
+EVOLUTION_URL = "https://evolution-api-production-5008.up.railway.app"
+INSTANCE_NAME = "restaurante atendimento"
+EVOLUTION_API_KEY = "55FDF751A44E-43F4-9768-1D0C01FE4979"
+
 # Prompt do Sistema Focado em Delivery de Comida
 SYSTEM_PROMPT = """
 Você é um assistente virtual inteligente e simpático de um negócio de comida/delivery. 
@@ -46,14 +51,14 @@ def webhook():
 
         message_body = msg_content.get("conversation") or msg_content.get("extendedTextMessage", {}).get("text", "")
         
-        # Se não houver texto puro (ex: foi emoji, foto, áudio ou reação), ignora
+        # Se não houver texto puro, ignora
         if not message_body:
             return jsonify({"status": "ignored_no_text"}), 200
 
         sender_number = message_data.get("key", {}).get("remoteJid", "")
         print(f"Mensagem de texto recebida de {sender_number}: {message_body}")
 
-        # Gera a resposta utilizando o Gemini com modelo alternativo para evitar instabilidade
+        # Gera a resposta utilizando o Gemini
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=message_body,
@@ -64,6 +69,19 @@ def webhook():
         
         reply_text = response.text
         print(f"Resposta gerada pelo Gemini: {reply_text}")
+
+        # Envia a resposta de volta para o cliente via Evolution API
+        send_url = f"{EVOLUTION_URL}/message/sendText/{INSTANCE_NAME}"
+        headers = {
+            "apikey": EVOLUTION_API_KEY,
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "number": sender_number.replace("@s.whatsapp.net", "").replace("@g.us", ""),
+            "text": reply_text
+        }
+        
+        requests.post(send_url, json=payload, headers=headers)
 
         return jsonify({"status": "success", "reply": reply_text}), 200
 
