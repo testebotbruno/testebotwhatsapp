@@ -1,14 +1,14 @@
 import os
 import requests
 from flask import Flask, request, jsonify
-from google import genai
 
 app = Flask(__name__)
 
-# Configuração do Gemini API usando a nova SDK oficial (google-genai)
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Configuração da API do Gemini via REST (leve e sem estourar memória do Render)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
 
-# Dados da Evolution API (Configurados diretamente para envio)
+# Dados da Evolution API
 EVOLUTION_URL = "https://evolution-api-production-5008.up.railway.app"
 INSTANCE_NAME = "restaurante atendimento"
 EVOLUTION_API_KEY = "55FDF751A44E-43F4-9768-1D0C01FE4979"
@@ -44,30 +44,35 @@ def webhook():
         if message_data.get("key", {}).get("fromMe", False):
             return jsonify({"status": "ignored"}), 200
 
-        # Extrai o conteúdo do texto apenas se for uma mensagem de texto válida
+        # Extrai o conteúdo do texto
         msg_content = message_data.get("message", {})
         if not isinstance(msg_content, dict):
             return jsonify({"status": "ignored"}), 200
 
         message_body = msg_content.get("conversation") or msg_content.get("extendedTextMessage", {}).get("text", "")
         
-        # Se não houver texto puro, ignora
         if not message_body:
             return jsonify({"status": "ignored_no_text"}), 200
 
         sender_number = message_data.get("key", {}).get("remoteJid", "")
         print(f"Mensagem de texto recebida de {sender_number}: {message_body}")
 
-        # Gera a resposta utilizando o modelo oficial atualizado
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=message_body,
-            config={
-                "system_instruction": SYSTEM_PROMPT,
-            }
-        )
+        # Monta a requisição para o Gemini via REST API (leve e sem erros de versão)
+        gemini_payload = {
+            "contents": [{"parts": [{"text": message_body}]}],
+            "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]}
+        }
         
-        reply_text = response.text
+        gemini_response = requests.post(GEMINI_URL, json=gemini_payload)
+        gemini_data = gemini_response.json()
+        
+        # Extrai a resposta gerada
+        try:
+            reply_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception:
+            print("Erro ao extrair resposta do Gemini:", gemini_data)
+            reply_text = "Olá! Recebi sua mensagem, mas tive um pequeno pico por aqui. Poderia repetir?"
+
         print(f"Resposta gerada pelo Gemini: {reply_text}")
 
         # Envia a resposta de volta para o cliente via Evolution API
