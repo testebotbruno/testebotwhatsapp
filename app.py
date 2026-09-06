@@ -58,9 +58,9 @@ def webhook():
         sender_number = message_data.get("key", {}).get("remoteJid", "")
         print(f"Mensagem de texto recebida de {sender_number}: {message_body}")
 
-        # Gera a resposta utilizando o Gemini
+        # Gera a resposta utilizando o modelo oficial atualizado
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
             contents=message_body,
             config={
                 "system_instruction": SYSTEM_PROMPT,
