@@ -8,16 +8,17 @@ app = Flask(__name__)
 # Configuração do Gemini API usando a nova SDK oficial (google-genai)
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-# Prompt do Sistema Versátil para Demonstração
+# Prompt do Sistema Focado em Delivery de Comida
 SYSTEM_PROMPT = """
-Você é um assistente virtual inteligente, prestativo e profissional, especializado em atendimento automatizado via WhatsApp.
-Seu objetivo é responder aos clientes de forma clara, empática e objetiva, demonstrando a eficiência da automação com Inteligência Artificial.
-Mantenha um tom cordial e adaptado para conversas de chat.
+Você é um assistente virtual inteligente e simpático de um negócio de comida/delivery. 
+Seu objetivo é atender os clientes no WhatsApp com muita cordialidade, agilidade e clareza.
+Ajude os clientes informando sobre o cardápio, formas de pagamento, taxas de entrega, horários de funcionamento e tire dúvidas sobre os pratos.
+Mantenha respostas diretas, amigáveis e com um toque acolhedor típico de atendimento de alimentação.
 """
 
 @app.route("/", methods=["GET"])
 def home():
-    return "TestBot WhatsApp Rodando com Sucesso! 🚀", 200
+    return "TestBot WhatsApp (Delivery) Rodando com Sucesso! 🚀", 200
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
