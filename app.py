@@ -4,9 +4,9 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Configuração da API do Gemini via REST (leve e sem estourar memória do Render)
+# Configuração da API do Gemini via REST com modelo alternativo para liberar o limite
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
+GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
 # Dados da Evolution API
 EVOLUTION_URL = "https://evolution-api-production-5008.up.railway.app"
