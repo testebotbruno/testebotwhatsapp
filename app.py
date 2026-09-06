@@ -4,7 +4,7 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Configuração da API do Gemini via REST com modelo alternativo para liberar o limite
+# Configuração da API do Gemini via REST
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
 
@@ -13,12 +13,25 @@ EVOLUTION_URL = "https://evolution-api-production-5008.up.railway.app"
 INSTANCE_NAME = "restaurante atendimento"
 EVOLUTION_API_KEY = "55FDF751A44E-43F4-9768-1D0C01FE4979"
 
-# Prompt do Sistema Focado em Delivery de Comida
+# Prompt do Sistema Focado na Mensagem de Boas-Vindas Exata que você pediu
 SYSTEM_PROMPT = """
-Você é um assistente virtual inteligente e simpático de um negócio de comida/delivery. 
-Seu objetivo é atender os clientes no WhatsApp com muita cordialidade, agilidade e clareza.
-Ajude os clientes informando sobre o cardápio, formas de pagamento, taxas de entrega, horários de funcionamento e tire dúvidas sobre os pratos.
-Mantenha respostas diretas, amigáveis e com um toque acolhedor típico de atendimento de alimentação.
+Você é o assistente virtual oficial de atendimento de um delivery de comida.
+Sempre que um cliente enviar uma saudação inicial (como "Olá", "Oi", "Boa tarde", "Bom dia", "Tudo bem?", etc.), você DEVE responder EXATAMENTE com esta mensagem de boas-vindas acolhedora:
+
+Olá! Tudo bem? 😊 
+
+Seja muito bem-vindo(a)! Que bom ter você por aqui. 😋🍔🍕
+
+Como posso te ajudar hoje? Se quiser, você pode me pedir:
+
+📜 O cardápio completo  
+🛵 Informações sobre taxa de entrega e bairros atendidos  
+⏰ Nossos horários de funcionamento  
+💳 As formas de pagamento aceitas  
+
+Ou, se já souber o que quer, é só me mandar o seu pedido! Como posso te atender agora?
+
+Para qualquer outra dúvida (cardápio, preços, horários, pagamentos ou pedidos), responda de forma muito simpática, direta e prestativa focada em delivery de comida.
 """
 
 @app.route("/", methods=["GET"])
@@ -57,7 +70,7 @@ def webhook():
         sender_number = message_data.get("key", {}).get("remoteJid", "")
         print(f"Mensagem de texto recebida de {sender_number}: {message_body}")
 
-        # Monta a requisição para o Gemini via REST API (leve e sem erros de versão)
+        # Monta a requisição para o Gemini via REST API
         gemini_payload = {
             "contents": [{"parts": [{"text": message_body}]}],
             "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]}
@@ -66,12 +79,13 @@ def webhook():
         gemini_response = requests.post(GEMINI_URL, json=gemini_payload)
         gemini_data = gemini_response.json()
         
-        # Extrai a resposta gerada
+        # Extrai a resposta gerada com segurança
         try:
             reply_text = gemini_data["candidates"][0]["content"]["parts"][0]["text"]
-        except Exception:
-            print("Erro ao extrair resposta do Gemini:", gemini_data)
-            reply_text = "Olá! Recebi sua mensagem, mas tive um pequeno pico por aqui. Poderia repetir?"
+        except Exception as err:
+            print("Erro detalhado do Gemini:", gemini_data)
+            # Mensagem padrão de fallback caso a IA demore
+            reply_text = "Olá! Tudo bem? 😊 Seja muito bem-vindo(a)! Como posso te ajudar hoje com o seu pedido?"
 
         print(f"Resposta gerada pelo Gemini: {reply_text}")
 
