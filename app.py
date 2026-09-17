@@ -100,7 +100,7 @@ def gerenciar_delays_humanizados(remote_jid, eh_arquivo=False):
     # 1. Pausa longa anti-bloqueio a cada 40 a 50 mensagens
     limite_pausa = random.randint(40, 50)
     if CONTADOR_MENSAGENS >= limite_pausa:
-        tempo_pausa_longa = random.uniform(120, 240) # 2 a 4 minutos
+        tempo_pausa_longa = random.uniform(120, 240)  # 2 a 4 minutos
         print(f"⏸️ [ANTI-BLOQUEIO] Atingido limite de {limite_pausa} envios. Pausando por {tempo_pausa_longa:.1f}s...", flush=True)
         time.sleep(tempo_pausa_longa)
         CONTADOR_MENSAGENS = 0
@@ -173,11 +173,14 @@ def processar_resposta(mensagem_cliente, nome_cliente=""):
         print(">>> ERRO CRÍTICO: GEMINI_API_KEY não configurada!", flush=True)
         return "Olá! Nosso sistema de atendimento está em manutenção. Um de nossos atendentes dará continuidade em instantes!"
 
+    # Formatação limpa do prompt para a IA evitar falhas de interpretação
+    prompt_usuario = f"O cliente {nome_cliente} perguntou: {mensagem_cliente}" if nome_cliente else mensagem_cliente
+
     for tentativa in range(2):
         try:
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=f"Cliente {nome_cliente}: {mensagem_cliente}",
+                contents=prompt_usuario,
                 config={"system_instruction": PROMPT_SISTEMA}
             )
             if response and response.text:
@@ -187,7 +190,7 @@ def processar_resposta(mensagem_cliente, nome_cliente=""):
             if tentativa == 0:
                 time.sleep(1)
 
-    return "Olá! Tivemos uma oscilação rápida na consulta. Um de nossos atendentes dará continuidade por aqui em instantes!"
+    return f"Olá{f', {nome_cliente}' if nome_cliente else ''}! Vou transferir sua dúvida para nossa equipe técnica. Um de nossos atendentes já te responde por aqui!"
 
 @app.route("/", methods=["GET"])
 def home():
