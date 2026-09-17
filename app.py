@@ -121,8 +121,9 @@ def processar_resposta(mensagem_cliente):
 
     for tentativa in range(2):
         try:
+            # Modelo atualizado compatível com o pacote google-genai
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-2.5-flash",
                 contents=f"Mensagem do cliente: {mensagem_cliente}",
                 config={"system_instruction": PROMPT_SISTEMA}
             )
@@ -134,7 +135,6 @@ def processar_resposta(mensagem_cliente):
                 time.sleep(1)
 
     return "Olá! Tivemos uma oscilação rápida na consulta. Um de nossos atendentes dará continuidade por aqui em instantes!"
-
 @app.route("/", methods=["GET"])
 def home():
     return "Ótica Malu - Webhook Operacional!"
