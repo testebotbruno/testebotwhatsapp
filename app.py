@@ -86,10 +86,9 @@ def simular_digitando_e_enviar(numero, texto):
     # 2. Delay estratégico
     time.sleep(3.5)
 
-    # 3. Disparo da mensagem com fallback de payload
+    # 3. Disparo da mensagem
     url_envio = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
     
-    # Estrutura compatível com Evolution v1.8 e v2.x
     payload_envio = {
         "number": numero_limpo,
         "options": {
@@ -121,7 +120,6 @@ def processar_resposta(mensagem_cliente):
 
     for tentativa in range(2):
         try:
-            # Modelo atualizado compatível com o pacote google-genai
             response = client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=f"Mensagem do cliente: {mensagem_cliente}",
@@ -135,6 +133,7 @@ def processar_resposta(mensagem_cliente):
                 time.sleep(1)
 
     return "Olá! Tivemos uma oscilação rápida na consulta. Um de nossos atendentes dará continuidade por aqui em instantes!"
+
 @app.route("/", methods=["GET"])
 def home():
     return "Ótica Malu - Webhook Operacional!"
@@ -160,7 +159,7 @@ def webhook():
         if not remote_jid or "status" in str(data.get("event", "")).lower():
             return "OK", 200
 
-        # Evita responder mensagens do próprio número do bot
+        # Evita responder mensagens enviadas pelo próprio bot
         is_from_me = (
             data.get("fromMe", False) 
             or key_data.get("fromMe", False) 
@@ -169,6 +168,7 @@ def webhook():
         if is_from_me:
             return "OK", 200
 
+        # Extração flexível da mensagem do cliente
         message_obj = sub_data.get("message", {}) if isinstance(sub_data, dict) and "message" in sub_data else data
         if isinstance(message_obj, list) and len(message_obj) > 0:
             message_obj = message_obj[0] if isinstance(message_obj[0], dict) else {}
@@ -189,6 +189,9 @@ def webhook():
             elif "body" in data:
                 user_message = str(data.get("body", ""))
 
+        if not user_message:
+            return "OK", 200
+
         msg_clean = user_message.strip().lower()
         print(f">>> Mensagem Recebida de [{remote_jid}]: '{user_message}'", flush=True)
 
@@ -199,22 +202,24 @@ def webhook():
         ]
         gatilhos_retorno = ["#voltar", "#ia", "#bot", "#ativar"]
 
+        # 1. Ativação da Pausa para Atendimento Humano
         if any(g in msg_clean for g in gatilhos_pausa):
             ATENDIMENTO_HUMANO.add(remote_jid)
             simular_digitando_e_enviar(remote_jid, "⏸️ *Atendimento automático pausado.* Um de nossos atendentes continuará seu atendimento em instantes!")
             return "OK", 200
 
+        # 2. Reativação do Robô pelo Atendente
         if msg_clean in gatilhos_retorno:
             ATENDIMENTO_HUMANO.discard(remote_jid)
             simular_digitando_e_enviar(remote_jid, "🤖 *Atendimento automático reativado!* Como posso te ajudar?")
             return "OK", 200
 
+        # 3. Se estiver pausado, ignora as mensagens
         if remote_jid in ATENDIMENTO_HUMANO:
+            print(f">>> [{remote_jid}] está em Atendimento Humano (Ignorado pelo Robô)", flush=True)
             return "OK", 200
 
-        if not user_message:
-            return "OK", 200
-
+        # 4. Resposta padrão do Gemini
         resposta_bot = processar_resposta(user_message)
         simular_digitando_e_enviar(remote_jid, resposta_bot)
 
