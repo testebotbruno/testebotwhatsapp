@@ -1,34 +1,25 @@
 import os
 import time
+import random
 import requests
 from flask import Flask, request
 from google import genai
 
 app = Flask(__name__)
 
-# Memória temporária para pausar o robô quando o humano intervir
+# Memória temporária de controle
 ATENDIMENTO_HUMANO = set()
+CONVERSAS_ATIVAS = set()  # Controla se é a 1ª mensagem da conversa
+CONTADOR_MENSAGENS = 0    # Contador global para pausas longas anti-bloqueio
 
-# Variáveis de Ambiente no Render
-EVOLUTION_URL = os.environ.get("EVOLUTION_API_URL", "").rstrip("/")
-EVOLUTION_INSTANCE = os.environ.get("EVOLUTION_INSTANCE", os.environ.get("EVOLUTION_INSTANCE_NAME", ""))
-API_KEY = os.environ.get("EVOLUTION_API_KEY", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+# Variáveis de Ambiente no Render (Leitura flexível)
+EVOLUTION_URL = (os.environ.get("EVOLUTION_API_URL") or os.environ.get("EVOLUTION_URL") or "").rstrip("/")
+EVOLUTION_INSTANCE = os.environ.get("EVOLUTION_INSTANCE") or os.environ.get("EVOLUTION_INSTANCE_NAME") or ""
+API_KEY = os.environ.get("EVOLUTION_API_KEY") or os.environ.get("API_KEY") or ""
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") or ""
 
 # Inicializa o cliente oficial do Gemini
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-
-# Mensagem Padrão de Boas-Vindas para Ótica Malu
-MENSAGEM_BOAS_VINDAS = (
-    "Olá! Seja bem-vindo(a) à *Ótica Malu*! 👓✨\n\n"
-    "Sou o assistente virtual e posso te ajudar com:\n"
-    "• Valores de Armações e Lentes (Monofocal, Multifocal, Antirreflexo)\n"
-    "• Agendamento e informações sobre Exame de Vista\n"
-    "• Óculos de Sol com proteção UV400\n"
-    "• Manutenção e Ajustes gratuitos\n\n"
-    "Como posso te ajudar hoje?\n"
-    "*(Digite *#atendente* a qualquer momento para falar com nossa equipe).*"
-)
 
 PROMPT_SISTEMA = """
 Você é o assistente virtual comercial da **Ótica Malu**.
@@ -55,15 +46,87 @@ INSTRUÇÕES RIGOROSAS:
 - Se o cliente solicitar atendimento humano, responda apenas informando que a equipe humana assumirá em instantes.
 """
 
-def simular_digitando_e_enviar(numero, texto):
-    """Envia o sinal de 'digitando...' por 3 a 5 segundos e realiza o envio da mensagem."""
+def obter_mensagem_boas_vindas(nome=""):
+    nome_fmt = f", {nome}" if nome else ""
+    opcoes = [
+        (
+            f"Olá{nome_fmt}! Seja bem-vindo(a) à *Ótica Malu*! 👓✨\n\n"
+            "Sou o assistente virtual e posso te ajudar com:\n"
+            "• Valores de Armações e Lentes (Monofocal, Multifocal, Antirreflexo)\n"
+            "• Agendamento e informações sobre Exame de Vista\n"
+            "• Óculos de Sol com proteção UV400\n"
+            "• Manutenção e Ajustes gratuitos\n\n"
+            "Como posso te ajudar hoje?\n"
+            "*(Digite *#atendente* a qualquer momento para falar com nossa equipe).*"
+        ),
+        (
+            f"Oi{nome_fmt}, que bom ter você por aqui! Na *Ótica Malu* te ajudamos a enxergar o melhor da vida. 👓\n\n"
+            "Posso te passar detalhes sobre:\n"
+            "• Exame de vista agendado\n"
+            "• Tabela de valores de armações e lentes\n"
+            "• Óculos escuros UV400\n"
+            "• Ajustes e manutenção\n\n"
+            "O que você precisa no momento?\n"
+            "*(Para falar com um atendente, digite *#atendente*)*"
+        ),
+        (
+            f"Olá{nome_fmt}! Que ótimo receber seu contato na *Ótica Malu*! 👓✨\n\n"
+            "Estou aqui para tirar dúvidas sobre:\n"
+            "• Valores de armações e lentes de grau\n"
+            "• Exame de vista parceiro\n"
+            "• Nossos óculos de sol com proteção UV400\n\n"
+            "Me conta: como posso te ajudar agora?\n"
+            "*(Se preferir falar com a equipe, digite *#atendente*)*"
+        )
+    ]
+    return random.choice(opcoes)
+
+def obter_mensagem_retorno(nome=""):
+    nome_fmt = f", {nome}" if nome else ""
+    opcoes = [
+        f"🤖 *Atendimento automático reativado!* Como posso te ajudar{nome_fmt}?",
+        f"🤖 *Prontinho{nome_fmt}! Voltei a te atender por aqui.* O que você gostaria de saber?",
+        f"🤖 *Modo automático ativado novamente!* Como posso te orientar agora{nome_fmt}?"
+    ]
+    return random.choice(opcoes)
+
+def gerenciar_delays_humanizados(remote_jid, eh_arquivo=False):
+    """Aplica atrasos aleatórios e pausa longa a cada 40-50 mensagens enviadas."""
+    global CONTADOR_MENSAGENS, CONVERSAS_ATIVAS
+
+    CONTADOR_MENSAGENS += 1
+    print(f">>> Mensagem de envio #{CONTADOR_MENSAGENS}", flush=True)
+
+    # 1. Pausa longa anti-bloqueio a cada 40 a 50 mensagens
+    limite_pausa = random.randint(40, 50)
+    if CONTADOR_MENSAGENS >= limite_pausa:
+        tempo_pausa_longa = random.uniform(120, 240) # 2 a 4 minutos
+        print(f"⏸️ [ANTI-BLOQUEIO] Atingido limite de {limite_pausa} envios. Pausando por {tempo_pausa_longa:.1f}s...", flush=True)
+        time.sleep(tempo_pausa_longa)
+        CONTADOR_MENSAGENS = 0
+
+    # 2. Definição do tempo de espera/digitação aleatório
+    if eh_arquivo:
+        tempo_espera = random.uniform(15, 25)
+    elif remote_jid not in CONVERSAS_ATIVAS:
+        tempo_espera = random.uniform(8, 15)  # 1ª mensagem da conversa
+        CONVERSAS_ATIVAS.add(remote_jid)
+    else:
+        tempo_espera = random.uniform(5, 10)   # Mensagens seguintes
+
+    return tempo_espera
+
+def simular_digitando_e_enviar(numero, texto, eh_arquivo=False):
+    """Calcula o delay aleatório, simula 'composing' e envia a mensagem."""
     if not EVOLUTION_URL or not API_KEY or not EVOLUTION_INSTANCE:
-        print(">>> ERRO: EVOLUTION_URL, EVOLUTION_INSTANCE ou API_KEY não configuradas!", flush=True)
+        print(f">>> ERRO CONFIGURAÇÃO: URL='{EVOLUTION_URL}', INSTANCE='{EVOLUTION_INSTANCE}', KEY_PRESENT={bool(API_KEY)}", flush=True)
         return
 
-    # Extrai estritamente os dígitos do telefone
     numero_limpo = "".join(filter(str.isdigit, str(numero).split("@")[0]))
-    print(f">>> Iniciando envio para: {numero_limpo}", flush=True)
+    
+    # Aplica cálculo humanizado de tempo
+    tempo_digito = gerenciar_delays_humanizados(numero_limpo, eh_arquivo=eh_arquivo)
+    print(f">>> Simulando 'digitando...' por {tempo_digito:.2f}s para {numero_limpo}", flush=True)
 
     headers = {
         "apikey": API_KEY,
@@ -71,48 +134,40 @@ def simular_digitando_e_enviar(numero, texto):
         "Content-Type": "application/json"
     }
 
-    # 1. Envia sinalização 'composing'
+    # 1. Indicador de Presença ("composing")
     try:
         url_presenca = f"{EVOLUTION_URL}/chat/sendPresence/{EVOLUTION_INSTANCE}"
         payload_presenca = {
             "number": numero_limpo,
             "presence": "composing",
-            "delay": 3000
+            "delay": int(tempo_digito * 1000)
         }
         requests.post(url_presenca, json=payload_presenca, headers=headers, timeout=5)
     except Exception as e:
         print(f"Aviso presença: {e}", flush=True)
 
-    # 2. Delay estratégico
-    time.sleep(3.5)
+    # Aguarda o tempo natural antes do envio
+    time.sleep(tempo_digito)
 
-    # 3. Disparo da mensagem
+    # 2. Envio da Mensagem
     url_envio = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
-    
     payload_envio = {
         "number": numero_limpo,
-        "options": {
-            "delay": 1200,
-            "presence": "composing"
-        },
-        "textMessage": {
-            "text": texto
-        },
         "text": texto
     }
 
     try:
         resp = requests.post(url_envio, json=payload_envio, headers=headers, timeout=15)
-        print(f">>> Resposta da Evolution API: HTTP {resp.status_code} - {resp.text}", flush=True)
+        print(f">>> Resposta Evolution: HTTP {resp.status_code} - {resp.text}", flush=True)
     except Exception as err:
         print(f"Erro ao enviar no WhatsApp: {err}", flush=True)
 
-def processar_resposta(mensagem_cliente):
+def processar_resposta(mensagem_cliente, nome_cliente=""):
     msg_limpa = mensagem_cliente.strip().lower()
 
     saudacoes_puras = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "inicio", "início"]
     if msg_limpa in saudacoes_puras:
-        return MENSAGEM_BOAS_VINDAS
+        return obter_mensagem_boas_vindas(nome_cliente)
 
     if not client:
         print(">>> ERRO CRÍTICO: GEMINI_API_KEY não configurada!", flush=True)
@@ -120,10 +175,9 @@ def processar_resposta(mensagem_cliente):
 
     for tentativa in range(2):
         try:
-            # Modelo oficial atualizado do SDK google-genai
             response = client.models.generate_content(
                 model="gemini-2.0-flash",
-                contents=f"Mensagem do cliente: {mensagem_cliente}",
+                contents=f"Cliente {nome_cliente}: {mensagem_cliente}",
                 config={"system_instruction": PROMPT_SISTEMA}
             )
             if response and response.text:
@@ -160,7 +214,7 @@ def webhook():
         if not remote_jid or "status" in str(data.get("event", "")).lower():
             return "OK", 200
 
-        # Evita responder mensagens enviadas pelo próprio bot
+        # Evita responder mensagens do próprio robô
         is_from_me = (
             data.get("fromMe", False) 
             or key_data.get("fromMe", False) 
@@ -169,7 +223,11 @@ def webhook():
         if is_from_me:
             return "OK", 200
 
-        # Extração flexível da mensagem do cliente
+        # Extração do Nome do Cliente
+        push_name = sub_data.get("pushName", "") or data.get("pushName", "")
+        nome_cliente = push_name.split()[0] if push_name else ""
+
+        # Extração da Mensagem do Cliente
         message_obj = sub_data.get("message", {}) if isinstance(sub_data, dict) and "message" in sub_data else data
         if isinstance(message_obj, list) and len(message_obj) > 0:
             message_obj = message_obj[0] if isinstance(message_obj[0], dict) else {}
@@ -194,7 +252,7 @@ def webhook():
             return "OK", 200
 
         msg_clean = user_message.strip().lower()
-        print(f">>> Mensagem Recebida de [{remote_jid}]: '{user_message}'", flush=True)
+        print(f">>> Mensagem Recebida de [{remote_jid}] ({nome_cliente}): '{user_message}'", flush=True)
 
         gatilhos_pausa = [
             "#pausa", "#atendente", "#humano", "#pausar",
@@ -203,25 +261,26 @@ def webhook():
         ]
         gatilhos_retorno = ["#voltar", "#ia", "#bot", "#ativar"]
 
-        # 1. Ativação da Pausa para Atendimento Humano
+        # 1. Ativação de Atendimento Humano
         if any(g in msg_clean for g in gatilhos_pausa):
             ATENDIMENTO_HUMANO.add(remote_jid)
-            simular_digitando_e_enviar(remote_jid, "⏸️ *Atendimento automático pausado.* Um de nossos atendentes continuará seu atendimento em instantes!")
+            simular_digitando_e_enviar(remote_jid, f"⏸️ *Atendimento automático pausado.* Um de nossos atendentes continuará seu atendimento em instantes{f', {nome_cliente}' if nome_cliente else ''}!")
             return "OK", 200
 
-        # 2. Reativação do Robô pelo Atendente
+        # 2. Reativação do Robô
         if msg_clean in gatilhos_retorno:
             ATENDIMENTO_HUMANO.discard(remote_jid)
-            simular_digitando_e_enviar(remote_jid, "🤖 *Atendimento automático reativado!* Como posso te ajudar?")
+            msg_ret = obter_mensagem_retorno(nome_cliente)
+            simular_digitando_e_enviar(remote_jid, msg_ret)
             return "OK", 200
 
-        # 3. Se estiver pausado, ignora as mensagens
+        # 3. Se estiver pausado, ignora
         if remote_jid in ATENDIMENTO_HUMANO:
             print(f">>> [{remote_jid}] está em Atendimento Humano (Ignorado pelo Robô)", flush=True)
             return "OK", 200
 
         # 4. Resposta padrão do Gemini
-        resposta_bot = processar_resposta(user_message)
+        resposta_bot = processar_resposta(user_message, nome_cliente)
         simular_digitando_e_enviar(remote_jid, resposta_bot)
 
         return "OK", 200
