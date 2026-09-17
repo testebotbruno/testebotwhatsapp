@@ -173,13 +173,12 @@ def processar_resposta(mensagem_cliente, nome_cliente=""):
         print(">>> ERRO CRÍTICO: GEMINI_API_KEY não configurada!", flush=True)
         return "Olá! Nosso sistema de atendimento está em manutenção. Um de nossos atendentes dará continuidade em instantes!"
 
-    # Formatação limpa do prompt para a IA evitar falhas de interpretação
     prompt_usuario = f"O cliente {nome_cliente} perguntou: {mensagem_cliente}" if nome_cliente else mensagem_cliente
 
     for tentativa in range(2):
         try:
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-1.5-flash",
                 contents=prompt_usuario,
                 config={"system_instruction": PROMPT_SISTEMA}
             )
@@ -282,15 +281,15 @@ def webhook():
             print(f">>> [{remote_jid}] está em Atendimento Humano (Ignorado pelo Robô)", flush=True)
             return "OK", 200
 
-        # 4. Resposta padrão do Gemini
-        resposta_bot = processar_resposta(user_message, nome_cliente)
-        simular_digitando_e_enviar(remote_jid, resposta_bot)
+        # 4. Processa a resposta com a IA e envia
+        resposta_ia = processar_resposta(user_message, nome_cliente)
+        simular_digitando_e_enviar(remote_jid, resposta_ia)
 
         return "OK", 200
-    except Exception as e:
-        print(f"Erro no webhook: {e}", flush=True)
+
+    except Exception as err:
+        print(f">>> ERRO NO WEBHOOK: {err}", flush=True)
         return "OK", 200
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=5000)
