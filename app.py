@@ -120,8 +120,9 @@ def processar_resposta(mensagem_cliente):
 
     for tentativa in range(2):
         try:
+            # Modelo oficial atualizado do SDK google-genai
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.0-flash",
                 contents=f"Mensagem do cliente: {mensagem_cliente}",
                 config={"system_instruction": PROMPT_SISTEMA}
             )
