@@ -27,7 +27,7 @@ MENSAGEM_BOAS_VINDAS = (
     "• Óculos de Sol com proteção UV400\n"
     "• Manutenção e Ajustes gratuitos\n\n"
     "Como posso te ajudar hoje?\n"
-    "*(Digite *#atendente* a qualquer momento para falar com nossa equipe).* "
+    "*(Digite *#atendente* a qualquer momento para falar com nossa equipe).*"
 )
 
 PROMPT_SISTEMA = """
@@ -61,8 +61,9 @@ def simular_digitando_e_enviar(numero, texto):
         print(">>> ERRO: EVOLUTION_URL, EVOLUTION_INSTANCE ou API_KEY não configuradas!", flush=True)
         return
 
-    # Trata o numero limpando @s.whatsapp.net e mantendo apenas dígitos
+    # Extrai estritamente os dígitos do telefone
     numero_limpo = "".join(filter(str.isdigit, str(numero).split("@")[0]))
+    print(f">>> Iniciando envio para: {numero_limpo}", flush=True)
 
     headers = {
         "apikey": API_KEY,
@@ -70,7 +71,7 @@ def simular_digitando_e_enviar(numero, texto):
         "Content-Type": "application/json"
     }
 
-    # 1. Envia sinalização de presença 'composing'
+    # 1. Envia sinalização 'composing'
     try:
         url_presenca = f"{EVOLUTION_URL}/chat/sendPresence/{EVOLUTION_INSTANCE}"
         payload_presenca = {
@@ -80,23 +81,32 @@ def simular_digitando_e_enviar(numero, texto):
         }
         requests.post(url_presenca, json=payload_presenca, headers=headers, timeout=5)
     except Exception as e:
-        print(f"Aviso ao enviar presença: {e}", flush=True)
+        print(f"Aviso presença: {e}", flush=True)
 
     # 2. Delay estratégico
     time.sleep(3.5)
 
-    # 3. Disparo do Texto
+    # 3. Disparo da mensagem com fallback de payload
     url_envio = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
+    
+    # Estrutura compatível com Evolution v1.8 e v2.x
     payload_envio = {
         "number": numero_limpo,
-        "text": texto,
-        "delay": 1200
+        "options": {
+            "delay": 1200,
+            "presence": "composing"
+        },
+        "textMessage": {
+            "text": texto
+        },
+        "text": texto
     }
+
     try:
         resp = requests.post(url_envio, json=payload_envio, headers=headers, timeout=15)
-        print(f">>> Resposta da Evolution API: {resp.status_code} - {resp.text}", flush=True)
+        print(f">>> Resposta da Evolution API: HTTP {resp.status_code} - {resp.text}", flush=True)
     except Exception as err:
-        print(f"Erro ao enviar mensagem no WhatsApp: {err}", flush=True)
+        print(f"Erro ao enviar no WhatsApp: {err}", flush=True)
 
 def processar_resposta(mensagem_cliente):
     msg_limpa = mensagem_cliente.strip().lower()
@@ -109,7 +119,6 @@ def processar_resposta(mensagem_cliente):
         print(">>> ERRO CRÍTICO: GEMINI_API_KEY não configurada!", flush=True)
         return "Olá! Nosso sistema de atendimento está em manutenção. Um de nossos atendentes dará continuidade em instantes!"
 
-    # Tentativa principal e retentativa
     for tentativa in range(2):
         try:
             response = client.models.generate_content(
@@ -148,11 +157,10 @@ def webhook():
         key_data = sub_data.get("key", {}) if isinstance(sub_data, dict) else {}
         remote_jid = key_data.get("remoteJid", "") or data.get("remoteJid", "")
 
-        # Filtra status e eventos irrelevantes
         if not remote_jid or "status" in str(data.get("event", "")).lower():
             return "OK", 200
 
-        # Bloqueio rigoroso de mensagens enviadas pelo próprio bot (Evita Loops)
+        # Evita responder mensagens do próprio número do bot
         is_from_me = (
             data.get("fromMe", False) 
             or key_data.get("fromMe", False) 
@@ -182,8 +190,8 @@ def webhook():
                 user_message = str(data.get("body", ""))
 
         msg_clean = user_message.strip().lower()
+        print(f">>> Mensagem Recebida de [{remote_jid}]: '{user_message}'", flush=True)
 
-        # Gatilhos para Pausa e Retorno
         gatilhos_pausa = [
             "#pausa", "#atendente", "#humano", "#pausar",
             "atendente", "falar com atendente", "humano", "atendimento humano",
@@ -191,7 +199,6 @@ def webhook():
         ]
         gatilhos_retorno = ["#voltar", "#ia", "#bot", "#ativar"]
 
-        # Intervenção Humana
         if any(g in msg_clean for g in gatilhos_pausa):
             ATENDIMENTO_HUMANO.add(remote_jid)
             simular_digitando_e_enviar(remote_jid, "⏸️ *Atendimento automático pausado.* Um de nossos atendentes continuará seu atendimento em instantes!")
