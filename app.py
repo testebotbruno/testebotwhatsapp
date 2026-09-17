@@ -180,7 +180,7 @@ def processar_resposta(mensagem_cliente, nome_cliente="", remote_jid=""):
     for tentativa in range(2):
         try:
             response = client.models.generate_content(
-               model="gemini-2.0-flash",
+                model="gemini-3.6-flash",
                 contents=prompt_usuario,
                 config={"system_instruction": PROMPT_SISTEMA}
             )
