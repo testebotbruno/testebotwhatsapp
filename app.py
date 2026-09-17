@@ -162,7 +162,7 @@ def simular_digitando_e_enviar(numero, texto, eh_arquivo=False):
     except Exception as err:
         print(f"Erro ao enviar no WhatsApp: {err}", flush=True)
 
-def processar_resposta(mensagem_cliente, nome_cliente=""):
+def processar_resposta(mensagem_cliente, nome_cliente="", remote_jid=""):
     msg_limpa = mensagem_cliente.strip().lower()
 
     saudacoes_puras = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "inicio", "início"]
@@ -171,6 +171,8 @@ def processar_resposta(mensagem_cliente, nome_cliente=""):
 
     if not client:
         print(">>> ERRO CRÍTICO: GEMINI_API_KEY não configurada!", flush=True)
+        if remote_jid:
+            ATENDIMENTO_HUMANO.add(remote_jid)
         return "Olá! Nosso sistema de atendimento está em manutenção. Um de nossos atendentes dará continuidade em instantes!"
 
     prompt_usuario = f"O cliente {nome_cliente} perguntou: {mensagem_cliente}" if nome_cliente else mensagem_cliente
@@ -188,6 +190,11 @@ def processar_resposta(mensagem_cliente, nome_cliente=""):
             print(f">>> ERRO GEMINI API (Tentativa {tentativa + 1}): {e}", flush=True)
             if tentativa == 0:
                 time.sleep(1)
+
+    # Caso atinja o erro/fallback, ativa automaticamente a pausa para atendimento humano
+    if remote_jid:
+        ATENDIMENTO_HUMANO.add(remote_jid)
+        print(f">>> [{remote_jid}] adicionado automaticamente ao ATENDIMENTO_HUMANO devido à falha da API.", flush=True)
 
     return f"Olá{f', {nome_cliente}' if nome_cliente else ''}! Vou transferir sua dúvida para nossa equipe técnica. Um de nossos atendentes já te responde por aqui!"
 
@@ -263,7 +270,7 @@ def webhook():
         ]
         gatilhos_retorno = ["#voltar", "#ia", "#bot", "#ativar"]
 
-        # 1. Ativação de Atendimento Humano
+        # 1. Ativação de Atendimento Humano Manual
         if any(g in msg_clean for g in gatilhos_pausa):
             ATENDIMENTO_HUMANO.add(remote_jid)
             simular_digitando_e_enviar(remote_jid, f"⏸️ *Atendimento automático pausado.* Um de nossos atendentes continuará seu atendimento em instantes{f', {nome_cliente}' if nome_cliente else ''}!")
@@ -281,8 +288,8 @@ def webhook():
             print(f">>> [{remote_jid}] está em Atendimento Humano (Ignorado pelo Robô)", flush=True)
             return "OK", 200
 
-        # 4. Processa a resposta com a IA e envia
-        resposta_ia = processar_resposta(user_message, nome_cliente)
+        # 4. Processa a resposta com a IA (passando o remote_jid para pausar se houver falha) e envia
+        resposta_ia = processar_resposta(user_message, nome_cliente, remote_jid)
         simular_digitando_e_enviar(remote_jid, resposta_ia)
 
         return "OK", 200
