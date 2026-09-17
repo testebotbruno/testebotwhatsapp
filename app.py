@@ -61,17 +61,20 @@ def simular_digitando_e_enviar(numero, texto):
         print(">>> ERRO: EVOLUTION_URL, EVOLUTION_INSTANCE ou API_KEY não configuradas!", flush=True)
         return
 
+    # Trata o numero limpando @s.whatsapp.net e mantendo apenas dígitos
+    numero_limpo = "".join(filter(str.isdigit, str(numero).split("@")[0]))
+
     headers = {
         "apikey": API_KEY,
         "Authorization": f"Bearer {API_KEY}",
         "Content-Type": "application/json"
     }
 
-    # 1. Envia sinalização de presença 'composing' (exibe 'digitando...' no celular do cliente)
+    # 1. Envia sinalização de presença 'composing'
     try:
         url_presenca = f"{EVOLUTION_URL}/chat/sendPresence/{EVOLUTION_INSTANCE}"
         payload_presenca = {
-            "number": str(numero),
+            "number": numero_limpo,
             "presence": "composing",
             "delay": 3000
         }
@@ -79,21 +82,19 @@ def simular_digitando_e_enviar(numero, texto):
     except Exception as e:
         print(f"Aviso ao enviar presença: {e}", flush=True)
 
-    # 2. Delay estratégico de 3 a 5 segundos no servidor para simular tempo humano de escrita
+    # 2. Delay estratégico
     time.sleep(3.5)
 
     # 3. Disparo do Texto
     url_envio = f"{EVOLUTION_URL}/message/sendText/{EVOLUTION_INSTANCE}"
     payload_envio = {
-        "number": str(numero),
+        "number": numero_limpo,
         "text": texto,
         "delay": 1200
     }
     try:
         resp = requests.post(url_envio, json=payload_envio, headers=headers, timeout=15)
-        if resp.status_code not in [200, 201]:
-            numero_limpo = "".join(filter(str.isdigit, str(numero)))
-            requests.post(url_envio, json={"number": numero_limpo, "text": texto, "delay": 1200}, headers=headers, timeout=15)
+        print(f">>> Resposta da Evolution API: {resp.status_code} - {resp.text}", flush=True)
     except Exception as err:
         print(f"Erro ao enviar mensagem no WhatsApp: {err}", flush=True)
 
